@@ -7,14 +7,8 @@
 .DATA
     X DW 100      ; Coordenada inicial X
     Y DW 100      ; Coordenada inicial Y
-    BG_COLOR DB 15 ; Color de fondo (blanco)
-    BTN_X DW 10   ; Coordenada X del botón
-    BTN_Y DW 10   ; Coordenada Y del botón
-    BTN_WIDTH DW 100   ; Ancho del botón
-    BTN_HEIGHT DW 30   ; Altura del botón
-    BTN_COLOR DB 4 ; Color del botón (rojo)
+    BG_COLOR DB 15 ; Color de fondo (negro)
     CURRENT_COLOR DB 4 ; Color actual del píxel (inicialmente rojo)
-
 ;-----------------------------------
 ; FINAL SEGMENTO DE DATOS
 ;-----------------------------------
@@ -44,12 +38,12 @@ CLEAR_SCREEN:
     INT 10H         ; Dibujar píxel en (CX, DX) con color AL
 
     INC CX          ; Incrementar la coordenada X
-    CMP CX, 320     ; ¿Llegamos al borde de la pantalla?
+    CMP CX, 350     ; ¿Llegamos al borde de la pantalla? (ancho de 320)
     JNE CONTINUE_CLEAR
 
     MOV CX, 0       ; Reiniciar X cuando lleguemos al borde
     INC DX          ; Mover a la siguiente fila
-    CMP DX, 200     ; ¿Llegamos al fondo de la pantalla?
+    CMP DX, 300     ; ¿Llegamos al fondo de la pantalla? (alto de 200)
     JNE CONTINUE_CLEAR
 
     JMP DONE_CLEAR   ; Si hemos limpiado la pantalla, salir
@@ -69,9 +63,9 @@ WAIT_FOR_CLICK:
     MOV [X], CX    ; Coordenada X del ratón
     MOV [Y], DX    ; Coordenada Y del ratón
 
-    ; Dibujar el píxel en la posición (X, Y) con color inicial
+  ; Dibujar el píxel en la posición (X, Y) con color verde
     MOV AH, 0CH     ; Función para escribir píxel
-    MOV AL, [CURRENT_COLOR] ; Color actual
+    MOV AL, 4       ; Color rojo
     MOV CX, [X]     ; Coordenada X
     MOV DX, [Y]     ; Coordenada Y
     INT 10H         ; Dibujar el píxel
@@ -83,13 +77,42 @@ MOVE_PIXEL:
     INT 16H         ; Leer tecla presionada
 
     ; Revisar las acciones
-    CMP AL, 'R'     ; Comprobar si se presionó 'R'
+    CMP AL, 52H
     JE CLEAR_SCREEN
 
     ; Revisar los colores
-   CMP AH, 30H     ; Número 0
-    JE CHANGE_COLOR_BLACK
-
+    CMP AH, 30H     ; Número 0
+    JE CHANGE_COLOR_BLACK_AUX
+    CMP AH, 31H     ; Número 1
+    JE CHANGE_COLOR_BLUE_AUX
+    CMP AH, 32H     ; Número 2
+    JE CHANGE_COLOR_GREEN_AUX
+    CMP AH, 33H     ; Número 3
+    JE CHANGE_COLOR_CYAN_AUX
+    CMP AH, 34H     ; Número 4
+    JE CHANGE_COLOR_RED_AUX
+    CMP AH, 35H     ; Número 5
+    JE CHANGE_COLOR_PURPLE_AUX
+    CMP AH, 36H     ; Número 6
+    JE CHANGE_COLOR_BROWN_AUX
+    CMP AH, 37H     ; Número 7
+    JE CHANGE_COLOR_DIRTY_WHITE_AUX
+    CMP AH, 38H     ; Número 8
+    JE CHANGE_COLOR_GRAY_AUX
+    CMP AH, 39H     ; Número 9
+    JE CHANGE_COLOR_LIGHT_BLUE_AUX
+    ; CPM AH, 41H     ; Número A
+    ; JE CHANGE_COLOR_LIGHT_GREEN
+    ; CMP AH, 42H     ; Número B
+    ; JE CHANGE_COLOR_SKY_BLUE
+    ; CMP AH, 43H     ; Número C
+    ; JE CHANGE_COLOR_LIGHT_RED
+    ; CMP AH, 44H     ; Número D
+    ; JE CHANGE_COLOR_PINK
+    ; CMP AH, 45H     ; Número E
+    ; JE CHANGE_COLOR_YELLOW
+    ; CMP AH, 46H     ; Número F
+    ; JE CHANGE_COLOR_LIGHT_WHITE
 
     ; Comparar con las teclas de flecha
     CMP AL, 0       ; Verificar si es una tecla especial
@@ -98,6 +121,7 @@ MOVE_PIXEL:
     ; Leer el segundo byte del código de tecla especial
     MOV AH, 00H
     INT 16H         ; Leer la segunda parte del código
+
 
     ; Revisar las teclas de flechas
     CMP AH, 48H     ; Flecha hacia arriba
@@ -109,35 +133,66 @@ MOVE_PIXEL:
     CMP AH, 4DH     ; Flecha hacia la derecha
     JE MOVE_RIGHT
 
-EXIT_CHECK:
-    JMP MOVE_PIXEL  ; Continuar moviendo
-CHANGE_COLOR_BLACK:
-    MOV [CURRENT_COLOR], 0 ; Negro
+MOVE_PIXEL_AUX:
     JMP MOVE_PIXEL
+
+CHANGE_COLOR_BLACK_AUX:
+    JMP CHANGE_COLOR_BLACK
+
+CHANGE_COLOR_BLUE_AUX:
+    JMP CHANGE_COLOR_BLUE
+
+CHANGE_COLOR_GREEN_AUX:
+    JMP CHANGE_COLOR_GREEN
+
+CHANGE_COLOR_CYAN_AUX:
+    JMP CHANGE_COLOR_CYAN
+
+CHANGE_COLOR_RED_AUX:
+    JMP CHANGE_COLOR_RED
+
+CHANGE_COLOR_PURPLE_AUX:
+    JMP CHANGE_COLOR_PURPLE
+
+CHANGE_COLOR_BROWN_AUX:
+    JMP CHANGE_COLOR_PURPLE
+
+CHANGE_COLOR_DIRTY_WHITE_AUX:
+    JMP CHANGE_COLOR_DIRTY_WHITE
+
+CHANGE_COLOR_GRAY_AUX:
+    JMP CHANGE_COLOR_GRAY
+
+CHANGE_COLOR_LIGHT_BLUE_AUX:
+    JMP CHANGE_COLOR_LIGHT_BLUE
+
+
+EXIT_CHECK:
+    JMP MOVE_PIXEL_AUX  ; Continuar moviendo
 
 MOVE_UP:
     CMP [Y], 0      ; Verificar si estamos en el límite superior
-    JLE MOVE_PIXEL  ; Si ya estamos en el límite, no mover
+    JLE MOVE_PIXEL_AUX  ; Si ya estamos en el límite, no mover
     DEC [Y]         ; Decrementar la coordenada Y
     JMP REDRAW_PIXEL
-
 MOVE_DOWN:
     CMP [Y], 199    ; Verificar si estamos en el límite inferior
-    JGE MOVE_PIXEL  ; Si ya estamos en el límite, no mover
+    JGE MOVE_PIXEL_AUX  ; Si ya estamos en el límite, no mover
     INC [Y]         ; Incrementar la coordenada Y
     JMP REDRAW_PIXEL
 
 MOVE_LEFT:
     CMP [X], 0      ; Verificar si estamos en el límite izquierdo
-    JLE MOVE_PIXEL  ; Si ya estamos en el límite, no mover
+    JLE MOVE_PIXEL_AUX  ; Si ya estamos en el límite, no mover
     DEC [X]         ; Decrementar la coordenada X
     JMP REDRAW_PIXEL
 
 MOVE_RIGHT:
     CMP [X], 319    ; Verificar si estamos en el límite derecho
-    JGE MOVE_PIXEL  ; Si ya estamos en el límite, no mover
+    JGE MOVE_PIXEL_AUX  ; Si ya estamos en el límite, no mover
     INC [X]         ; Incrementar la coordenada X
     JMP REDRAW_PIXEL
+
 
 REDRAW_PIXEL:
     ; Limpiar el píxel anterior dibujando con el color de fondo
@@ -149,14 +204,55 @@ REDRAW_PIXEL:
 
     ; Dibujar el nuevo píxel en la nueva posición
     MOV AH, 0CH     ; Función para escribir píxel
-    MOV AL, [CURRENT_COLOR] ; Color actual
+    MOV AL, 4       ; Color rojo
     MOV CX, [X]     ; Coordenada X
     MOV DX, [Y]     ; Coordenada Y
     INT 10H         ; Dibujar el nuevo píxel
 
     JMP MOVE_PIXEL   ; Continuar esperando por teclas
 
-; Cambiar colores según la tecla presionada
+    ; Restaurar modo texto (modo 03h) antes de salir
+    
+CHANGE_COLOR_BLACK:
+    MOV [CURRENT_COLOR], 0 ; Negro
+    JMP MOVE_PIXEL
+
+CHANGE_COLOR_BLUE:
+    MOV [CURRENT_COLOR], 1 ; Azul
+    JMP MOVE_PIXEL
+
+CHANGE_COLOR_GREEN:
+    MOV [CURRENT_COLOR], 2 ; Verde
+    JMP MOVE_PIXEL
+
+CHANGE_COLOR_CYAN:
+    MOV [CURRENT_COLOR], 3 ; Cian
+    JMP MOVE_PIXEL
+
+CHANGE_COLOR_RED:
+    MOV [CURRENT_COLOR], 4 ; Rojo
+    JMP MOVE_PIXEL
+
+CHANGE_COLOR_PURPLE:
+    MOV [CURRENT_COLOR], 5 ; Púrpura
+    JMP MOVE_PIXEL
+
+CHANGE_COLOR_BROWN:
+    MOV [CURRENT_COLOR], 6 ; Marrón
+    JMP MOVE_PIXEL
+
+CHANGE_COLOR_DIRTY_WHITE:
+    MOV [CURRENT_COLOR], 7 ; Blanco sucio
+    JMP MOVE_PIXEL
+
+CHANGE_COLOR_GRAY:
+    MOV [CURRENT_COLOR], 8 ; Gris
+    JMP MOVE_PIXEL
+
+CHANGE_COLOR_LIGHT_BLUE:
+    MOV [CURRENT_COLOR], 9 ; Azul claro
+    JMP MOVE_PIXEL
+
 
 EXIT_PROGRAM:
     MOV AX, 0003H   ; Modo 03h = 80x25 texto
@@ -165,5 +261,6 @@ EXIT_PROGRAM:
     ; Terminar el programa
     MOV AH, 4CH
     INT 21H
+
 MAIN ENDP
 END MAIN
