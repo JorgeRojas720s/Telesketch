@@ -8,11 +8,6 @@
     X DW 100      ; Coordenada inicial X
     Y DW 100      ; Coordenada inicial Y
     BG_COLOR DB 15 ; Color de fondo (blanco)
-    BTN_X DW 10   ; Coordenada X del botón
-    BTN_Y DW 10   ; Coordenada Y del botón
-    BTN_WIDTH DW 100   ; Ancho del botón
-    BTN_HEIGHT DW 30   ; Altura del botón
-    BTN_COLOR DB 4 ; Color del botón (rojo)
     CURRENT_COLOR DB 4 ; Color actual del píxel (inicialmente rojo)
 
 ;-----------------------------------
@@ -86,18 +81,18 @@ MOVE_PIXEL:
     CMP AL, 'R'     ; Comprobar si se presionó 'R'
     JE CLEAR_SCREEN
 
-    ; Revisar los colores
-   CMP AH, 30H     ; Número 0
-    JE CHANGE_COLOR_BLACK
-
+    ; ; Revisar los colores
+    ; CMP AH, 30H     ; Número 0
+    ; JE CHANGE_COLOR_BLACK
 
     ; Comparar con las teclas de flecha
-    CMP AL, 0       ; Verificar si es una tecla especial
-    JNE EXIT_CHECK  ; Si no es tecla especial, salir
+    CMP AL, 0H       ; Verificar si es una tecla especial
+    JNE CHECK_COLORS  ; Si no es tecla especial, salir
+    
 
-    ; Leer el segundo byte del código de tecla especial
-    MOV AH, 00H
-    INT 16H         ; Leer la segunda parte del código
+    ; ; Leer el segundo byte del código de tecla especial
+    ; MOV AH, 00H
+    ; INT 16H         ; Leer la segunda parte del código
 
     ; Revisar las teclas de flechas
     CMP AH, 48H     ; Flecha hacia arriba
@@ -109,10 +104,25 @@ MOVE_PIXEL:
     CMP AH, 4DH     ; Flecha hacia la derecha
     JE MOVE_RIGHT
 
-EXIT_CHECK:
-    JMP MOVE_PIXEL  ; Continuar moviendo
+
+CHECK_COLORS:
+    ; Revisar los colores
+    CMP AL, 30H     ; Número 0
+    JE CHANGE_COLOR_BLACK
+    CMP AL, 31H     ; Número 1
+    JE CHANGE_COLOR_BLUE
+    CMP AL, 32H     ; Número 2
+    JE CHANGE_COLOR_GREEN
+
+
 CHANGE_COLOR_BLACK:
     MOV [CURRENT_COLOR], 0 ; Negro
+    JMP MOVE_PIXEL
+CHANGE_COLOR_BLUE:
+    MOV [CURRENT_COLOR], 1 ; Azul
+    JMP MOVE_PIXEL
+CHANGE_COLOR_GREEN:
+    MOV [CURRENT_COLOR], 2 ; Verde
     JMP MOVE_PIXEL
 
 MOVE_UP:
@@ -138,7 +148,6 @@ MOVE_RIGHT:
     JGE MOVE_PIXEL  ; Si ya estamos en el límite, no mover
     INC [X]         ; Incrementar la coordenada X
     JMP REDRAW_PIXEL
-
 REDRAW_PIXEL:
     ; Limpiar el píxel anterior dibujando con el color de fondo
     MOV AH, 0CH     ; Función para escribir píxel
