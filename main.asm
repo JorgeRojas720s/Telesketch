@@ -32,28 +32,8 @@ MAIN PROC FAR
     MOV AX, 0       ; Color de fondo (negro)
     MOV CX, 0       ; Reiniciar coordenada X
     MOV DX, 0       ; Reiniciar coordenada Y
+    CALL CLEAR_SCREEN
 
-CLEAR_SCREEN:
-    MOV AH, 0CH     ; Función para escribir píxel
-    MOV AL, BG_COLOR ; Color de fondo
-    INT 10H         ; Dibujar píxel en (CX, DX) con color AL
-
-    INC CX          ; Incrementar la coordenada X
-    CMP CX, 320     ; ¿Llegamos al borde de la pantalla?
-    JNE CONTINUE_CLEAR
-
-    MOV CX, 0       ; Reiniciar X cuando lleguemos al borde
-    INC DX          ; Mover a la siguiente fila
-    CMP DX, 200     ; ¿Llegamos al fondo de la pantalla?
-    JNE CONTINUE_CLEAR
-
-    JMP DONE_CLEAR   ; Si hemos limpiado la pantalla, salir
-
-CONTINUE_CLEAR:
-    JMP CLEAR_SCREEN ; Repetir hasta limpiar la pantalla
-
-DONE_CLEAR:
-    ; Esperar el clic izquierdo del ratón
 WAIT_FOR_CLICK:
     MOV AX, 3      ; Función para obtener estado del ratón
     INT 33H
@@ -72,7 +52,49 @@ WAIT_FOR_CLICK:
     INT 10H         ; Dibujar el píxel
 
     ; Bucle para mover el píxel con las teclas de flecha
-MOVE_PIXEL:
+ 
+CHECK_COLORS:
+    ; Revisar los colores
+    CMP AL, 30H     ; Número 0
+    JE CHANGE_COLOR_BLACK
+    CMP AL, 31H     ; Número 1
+    JE CHANGE_COLOR_BLUE
+    CMP AL, 32H     ; Número 2
+    JE CHANGE_COLOR_GREEN
+    CMP AL, 33H     ; Número 3
+    JE CHANGE_COLOR_RED
+    CMP AL, 34H     ; Número 4
+    JE CHANGE_COLOR_PURPLE
+    CMP AL, 35H     ; Número 5
+    JE CHANGE_COLOR_BROWN
+ 
+ ;--------Cambio de color-----------
+
+CHANGE_COLOR_BLACK:
+    MOV [CURRENT_COLOR], 0 ; Negro
+    JMP MOVE_PIXEL
+
+CHANGE_COLOR_BLUE:
+    MOV [CURRENT_COLOR], 1 ; Azul
+    JMP MOVE_PIXEL
+
+CHANGE_COLOR_GREEN:
+    MOV [CURRENT_COLOR], 2 ; Verde
+    JMP MOVE_PIXEL
+
+CHANGE_COLOR_RED:
+    MOV [CURRENT_COLOR], 4 ; Rojo
+    JMP MOVE_PIXEL
+
+CHANGE_COLOR_PURPLE:
+    MOV [CURRENT_COLOR], 5 ; Púrpura
+    JMP MOVE_PIXEL
+
+CHANGE_COLOR_BROWN:
+    MOV [CURRENT_COLOR], 6 ; Marrón
+    JMP MOVE_PIXEL
+
+ MOVE_PIXEL:
     ; Esperar por una tecla
     MOV AH, 00H
     INT 16H         ; Leer tecla presionada
@@ -81,18 +103,9 @@ MOVE_PIXEL:
     CMP AL, 'R'     ; Comprobar si se presionó 'R'
     JE CLEAR_SCREEN
 
-    ; ; Revisar los colores
-    ; CMP AH, 30H     ; Número 0
-    ; JE CHANGE_COLOR_BLACK
-
     ; Comparar con las teclas de flecha
     CMP AL, 0H       ; Verificar si es una tecla especial
     JNE CHECK_COLORS  ; Si no es tecla especial, salir
-    
-
-    ; ; Leer el segundo byte del código de tecla especial
-    ; MOV AH, 00H
-    ; INT 16H         ; Leer la segunda parte del código
 
     ; Revisar las teclas de flechas
     CMP AH, 48H     ; Flecha hacia arriba
@@ -103,52 +116,13 @@ MOVE_PIXEL:
     JE MOVE_LEFT
     CMP AH, 4DH     ; Flecha hacia la derecha
     JE MOVE_RIGHT
+   
+    CALL MOVEMENTS
+    CALL REDRAW_PIXEL
+    CALL EXIT_PROGRAM
+MAIN ENDP
 
-
-CHECK_COLORS:
-    ; Revisar los colores
-    CMP AL, 30H     ; Número 0
-    JE CHANGE_COLOR_BLACK
-    CMP AL, 31H     ; Número 1
-    JE CHANGE_COLOR_BLUE
-    CMP AL, 32H     ; Número 2
-    JE CHANGE_COLOR_GREEN
-
-
-CHANGE_COLOR_BLACK:
-    MOV [CURRENT_COLOR], 0 ; Negro
-    JMP MOVE_PIXEL
-CHANGE_COLOR_BLUE:
-    MOV [CURRENT_COLOR], 1 ; Azul
-    JMP MOVE_PIXEL
-CHANGE_COLOR_GREEN:
-    MOV [CURRENT_COLOR], 2 ; Verde
-    JMP MOVE_PIXEL
-
-MOVE_UP:
-    CMP [Y], 0      ; Verificar si estamos en el límite superior
-    JLE MOVE_PIXEL  ; Si ya estamos en el límite, no mover
-    DEC [Y]         ; Decrementar la coordenada Y
-    JMP REDRAW_PIXEL
-
-MOVE_DOWN:
-    CMP [Y], 199    ; Verificar si estamos en el límite inferior
-    JGE MOVE_PIXEL  ; Si ya estamos en el límite, no mover
-    INC [Y]         ; Incrementar la coordenada Y
-    JMP REDRAW_PIXEL
-
-MOVE_LEFT:
-    CMP [X], 0      ; Verificar si estamos en el límite izquierdo
-    JLE MOVE_PIXEL  ; Si ya estamos en el límite, no mover
-    DEC [X]         ; Decrementar la coordenada X
-    JMP REDRAW_PIXEL
-
-MOVE_RIGHT:
-    CMP [X], 319    ; Verificar si estamos en el límite derecho
-    JGE MOVE_PIXEL  ; Si ya estamos en el límite, no mover
-    INC [X]         ; Incrementar la coordenada X
-    JMP REDRAW_PIXEL
-REDRAW_PIXEL:
+REDRAW_PIXEL PROC
     ; Limpiar el píxel anterior dibujando con el color de fondo
     MOV AH, 0CH     ; Función para escribir píxel
     MOV AL, BG_COLOR ; Color de fondo
@@ -164,15 +138,64 @@ REDRAW_PIXEL:
     INT 10H         ; Dibujar el nuevo píxel
 
     JMP MOVE_PIXEL   ; Continuar esperando por teclas
+REDRAW_PIXEL ENDP
+MOVEMENTS PROC
+    MOVE_UP:
+        CMP [Y], 0      ; Verificar si estamos en el límite superior
+        JLE MOVE_PIXEL  ; Si ya estamos en el límite, no mover
+        DEC [Y]         ; Decrementar la coordenada Y
+        CALL REDRAW_PIXEL
 
-; Cambiar colores según la tecla presionada
+    MOVE_DOWN:
+        CMP [Y], 199    ; Verificar si estamos en el límite inferior
+        JGE MOVE_PIXEL  ; Si ya estamos en el límite, no mover
+        INC [Y]         ; Incrementar la coordenada Y
+        CALL REDRAW_PIXEL
 
-EXIT_PROGRAM:
+    MOVE_LEFT:
+        CMP [X], 0      ; Verificar si estamos en el límite izquierdo
+        JLE MOVE_PIXEL  ; Si ya estamos en el límite, no mover
+        DEC [X]         ; Decrementar la coordenada X
+        CALL REDRAW_PIXEL
+
+    MOVE_RIGHT:
+        CMP [X], 319    ; Verificar si estamos en el límite derecho
+        JGE MOVE_PIXEL  ; Si ya estamos en el límite, no mover
+        INC [X]         ; Incrementar la coordenada X
+        CALL REDRAW_PIXEL
+MOVEMENTS ENDP
+CLEAR_SCREEN PROC
+    ; Limpiar toda la pantalla
+    MOV CX, 0       ; Reiniciar coordenada X
+    MOV DX, 0       ; Reiniciar coordenada Y
+
+CLEAR_LOOP:
+    MOV AH, 0CH     ; Función para escribir píxel
+    MOV AL, BG_COLOR ; Color de fondo
+    INT 10H         ; Dibujar píxel en (CX, DX) con color AL
+
+    INC CX          ; Incrementar la coordenada X
+    CMP CX, 320     ; ¿Llegamos al borde de la pantalla?
+    JNE CLEAR_LOOP
+
+    MOV CX, 0       ; Reiniciar X cuando lleguemos al borde
+    INC DX          ; Mover a la siguiente fila
+    CMP DX, 200     ; ¿Llegamos al fondo de la pantalla?
+    JNE CLEAR_LOOP
+
+    ; Regresar al bucle de selección de nuevo punto
+    JMP WAIT_FOR_CLICK 
+CLEAR_SCREEN ENDP
+
+
+EXIT_PROGRAM PROC
     MOV AX, 0003H   ; Modo 03h = 80x25 texto
     INT 10H         ; Interrupción para cambiar modo de video
 
     ; Terminar el programa
     MOV AH, 4CH
     INT 21H
-MAIN ENDP
+EXIT_PROGRAM ENDP
+
+
 END MAIN
