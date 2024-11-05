@@ -10,55 +10,53 @@
 ;-----------------------------------
     X DW 100                   ; Coordenada inicial X
     Y DW 100                   ; Coordenada inicial Y
-    BG_COLOR DB 0             ; Color de fondo (blanco)
+    SCREEN_WIDTH EQU 640       ; Tamaño del ancho de la pantalla
+    SCREEN_HEIGHT EQU 480      ; Tamaño del largo de la pantalla
+    BG_COLOR DB 15             ; Color de fondo (blanco)
     HELLO	DB	'Telesketch$'
     FPIX	DW	0
     CPIX	DW	0
-    ;Colors
     BLACK DB '0.$'
     BLUE DB '1.$'
     GREEN DB '2.$'
     RED DB '3.$'
     PURPLE DB '4.$'
     BROWN DB '5.$'
-    LIGHT_BLUE DB '6.$'
-    LIGHT_GREEN DB '7.$'
-    YELLOW DB '8.$'
-    CYAN DB '9.$'
-    ;Comands
     SAVE_FILE DB 's = Save$'
     EXIT DB 'e = Exit$'
-    CLEAR DB 'c = Clear$'
-    LOAD DB 'r + click = Load File$'
-    TEXT_COLORS DB 'Colors$'
-    TEXT_COMMANDS DB 'Commands$'
+    CLEAR DB 'r = Clear$'
+    LOAD DB 'c + click = Load File$'
 ;-----------------------------------
 ; VARIABLES PARA VIDEO
 ;-----------------------------------
-    CURRENT_COLOR DB 4        
+    CURRENT_COLOR DB 4         ; Color actual del píxel (inicialmente rojo)
+    SCREEN_BUFFER DB SCREEN_WIDTH * SCREEN_HEIGHT DUP(0)  ; Búfer para almacenar caracteres ASCII de cada píxel
 ;-----------------------------------
 ; VARIABLES PARA GUARDAR EN EL ARCHIVO
-;-----------------------------------               
+;-----------------------------------
+    BUFFER DB 20000 DUP(0)                   ; Buffer para almacenar datos
     ERROR_MSG DB 'Error al crear el archivo: $', 0
     WRITE_ERROR_MSG DB 'NO SE PUO ESCRIBIR', 0
+    SUCCESS_MSG DB 'SHI SE PUDO', 0
     FILE_NAME DB "salida.TXT", 0  
     MESSAGE_USER_INPUT DB 'Ingrese el nombre del archivo: $'
     ;FILE_NAME DB 20 DUP('$')
 ;-----------------------------------
 ; VARIABLES PARA MANEJAR EN EL ARCHIVO
 ;-----------------------------------
-    FILE_HANDLE DW ?                     
+    FILE_HANDLE DW ?              ; Variable para almacenar el manejador del archivo
+    TEMP_COLOR DB ?               ; Variable temporal para almacenar el color del píxel
     TEMP_CHAR DB ?              
     TEMP_CHAR_AUX DB ?
 ;-----------------------------------
 ; MACRO PARA EL CURSOR
 ;-----------------------------------
-    POS_CURSOR MACRO FIL, COL		
+    POS_CURSOR MACRO FIL, COL		;UN TIPO DE "METODO" QUE RECIBE 2 PARAMETROS
         MOV AH, 02H
         MOV BH, 00
         MOV DH, FIL
         MOV DL, COL
-        INT 10H						
+        INT 10H						;INTERRUPCION DE VIDEO
     ENDM
 ;-----------------------------------
 ; MAIN
@@ -69,7 +67,7 @@ MAIN PROC FAR
     MOV AX, @DATA
     MOV DS, AX
 
-    CALL MODEVIDEO  
+    CALL MODEVIDEO  ; Interrupción para cambiar modo de video
     
     MOV CPIX, 50D
     MOV FPIX, 30D
@@ -80,17 +78,17 @@ MAIN PROC FAR
 	CALL DRAWLINE_COL
 
     MOV CPIX, 50D
-	CALL DRAWLINE_ROW		
+	CALL DRAWLINE_ROW		;PINTAR UNA LINEA DE PIXELES EN LA POSICION FPIX Y CPIX
 
     MOV FPIX, 30D
 	CALL DRAWLINE_COL
 
     CALL INIT_MOUSE
 
-    POS_CURSOR 0, 24
+    POS_CURSOR 0, 20
 
     LEA	DX, HELLO
-	MOV	AH, 9H		
+	MOV	AH, 9H		;VISUALIZACION CADENA DE CARACTERES
 	INT	21H
     CALL DRAW_COLORS
 
@@ -112,26 +110,26 @@ MODEVIDEO PROC
     INT 10H
 
     ; Establecer color de relleno a blanco (color 15)
-    MOV AX, 0A000H        
-    MOV ES, AX            
-    MOV DI, 0             
+    MOV AX, 0A000H        ; Dirección base del buffer de video en modo 12h
+    MOV ES, AX            ; Guardar dirección base en segmento ES
+    MOV DI, 0             ; Empezar desde el primer pixel
 
-    ;MOV CX, 640 * 480 / 2 
-    MOV AX, 0FFFFH        
+    MOV CX, 640 * 480 / 2 ; Número de palabras a escribir (cada palabra son 2 píxeles)
+    MOV AX, 0FFFFH        ; 0F0F para que ambos píxeles sean blancos (color 15)
 
     FILL_SCREEN:
-        STOSW                 
-        LOOP FILL_SCREEN      
+        STOSW                 ; Almacenar palabra en la memoria (2 píxeles blancos)
+        LOOP FILL_SCREEN      ; Repetir hasta llenar toda la pantalla
         RET
 MODEVIDEO ENDP
 ;-----------------------------------
 ; FUNCIÓN PARA DIBUJAR UNA LÍNEA EN ROW
 ;-----------------------------------
 DRAWLINE_ROW PROC NEAR
-    MOV CX, 370
+    MOV CX, 300
     CICLO_ROW:
         PUSH CX
-        MOV AL, 0FH          
+        MOV AL, 00H          ; Color negro (0) en lugar de 0AH
         MOV BX, 00
         MOV CX, CPIX
         MOV DX, FPIX
@@ -146,18 +144,18 @@ DRAWLINE_ROW ENDP
 ; FUNCIÓN PARA DIBUJAR UNA LÍNEA EN COL
 ;-----------------------------------
 DRAWLINE_COL PROC NEAR
-    MOV CX, 400           ; Longitud de la línea
+    MOV CX, 300           ; Longitud de la línea
     CICLO_COL:
         PUSH CX
-        MOV AL, 0FH          
-        MOV BX, 00           
+        MOV AL, 00H          ; Color negro (0)
+        MOV BX, 00           ; No se usa aquí, pero se puede dejar para consistencia
         MOV DX, FPIX         ; Guardamos la coordenada Y en DX
         MOV CX, CPIX         ; Guardamos la coordenada X en CX
         MOV AH, 0CH
-        INT 10H              
-        INC FPIX             
+        INT 10H              ; Dibuja el píxel en la posición (CPIX, FPIX)
+        INC FPIX             ; Incrementa FPIX para mover hacia abajo (o decrementar para arriba)
         POP CX
-        LOOP CICLO_COL           
+        LOOP CICLO_COL           ; Repite para la longitud deseada
         RET
 DRAWLINE_COL ENDP
 ;-----------------------------------
@@ -175,7 +173,7 @@ WAIT_FOR_MOUSE_CLICK PROC
     MOV AX, 3      ; Función para obtener estado del ratón
     INT 33H
     TEST BX, 1     ; Verificar si el botón izquierdo está presionado (bit 0)
-    JZ WAIT_FOR_MOUSE_CLICK 
+    JZ WAIT_FOR_MOUSE_CLICK ; Si no está presionado, esperar
     RET
 WAIT_FOR_MOUSE_CLICK ENDP
 ;-----------------------------------
@@ -183,10 +181,10 @@ WAIT_FOR_MOUSE_CLICK ENDP
 ;-----------------------------------
 DRAW_PIXEL PROC
     MOV AH, 0CH     ; Función para escribir píxel
-    MOV AL, [CURRENT_COLOR] 
-    MOV CX, [X]     
-    MOV DX, [Y]     
-    INT 10H         
+    MOV AL, [CURRENT_COLOR] ; Color actual
+    MOV CX, [X]     ; Coordenada X
+    MOV DX, [Y]     ; Coordenada Y
+    INT 10H         ; Dibujar el píxel
     RET
 DRAW_PIXEL ENDP
 ;-----------------------------------
@@ -198,13 +196,13 @@ WRITE_SCREEN_TO_FILE PROC
     ;CALL ASK_FILE_NAME
     ; Crear archivo
     MOV AH, 3CH               ; Función DOS para crear archivo
-    MOV CX, 0                 
-    LEA DX, FILE_NAME         
+    MOV CX, 0                 ; Sin atributos
+    LEA DX, FILE_NAME         ; Dirección del nombre del archivo
     INT 21H
-    JC FILE_ERROR             
+    JC FILE_ERROR             ; Salta si hubo error al crear
 
     MOV BX, AX                ; Guardar el manejador del archivo en BX
-    MOV FILE_HANDLE, BX       
+    MOV FILE_HANDLE, BX       ; Almacenar el manejador en FILE_HANDLE
 
     MOV DI, 51
     MOV SI, 31
@@ -215,46 +213,46 @@ WRITE_SCREEN_TO_FILE PROC
         ; Coordenadas iniciales
         MOV CX, DI                 ; X inicial
         MOV DX, SI                 ; Y inicial
-        INT 10H                   
+        INT 10H                   ; Llamada a la BIOS, color en AL
 
     CALL CHECK_COLORS_IN_AL
 
     WritePixel:
         ; Escribir el carácter en el archivo
-        MOV BX, FILE_HANDLE       
+        MOV BX, FILE_HANDLE       ; Manejador del archivo
         MOV AH, 40H               ; Función DOS para escribir en archivo
         LEA DX, TEMP_CHAR         ; Dirección del carácter a escribir
-        MOV CX, 1                 
-        INT 21H                   
+        MOV CX, 1                 ; Longitud de los datos (1 byte)
+        INT 21H                   ; Escribir carácter en archivo
 
         ; Avanzar al siguiente píxel
-        INC DI                    
-        CMP DI, 419
+        INC DI                    ; Incrementar X
+        CMP DI, 348
         JE .WriteX
-        CMP DI, 419            
+        CMP DI, 348             ; Limitar ancho máximo (640)
         JBE ContinueX           
 
-        MOV DI, 51                 
-        INC SI                    
-        CMP SI, 429               
+        MOV DI, 51                 ; Reiniciar X a la posición inicial en nueva fila
+        INC SI                    ; Incrementar Y
+        CMP SI, 328               ; Limitar altura máxima (480)
         JBE SAVE_PIXELS        
 
-        JMP EndSave              
+        JMP EndSave              ; Terminar si se excede la altura
     .WriteX:
         MOV TEMP_CHAR, 0AH
         JMP WritePixel
     ContinueX:
-        JMP SAVE_PIXELS           
+        JMP SAVE_PIXELS           ; Leer el siguiente píxel
 
     EndSave:
         ; Cerrar archivo
-        MOV BX, FILE_HANDLE       
+        MOV BX, FILE_HANDLE       ; Manejador del archivo
         MOV AH, 3EH               ; Función DOS para cerrar archivo
         INT 21H
         RET
 
     FILE_ERROR:
-        MOV DX, OFFSET ERROR_MSG        
+        MOV DX, OFFSET ERROR_MSG        ; Mostrar mensaje de error
         MOV AH, 09H
         INT 21H
         LEA DX, FILE_NAME
@@ -264,70 +262,67 @@ WRITE_SCREEN_TO_FILE PROC
 
 WRITE_SCREEN_TO_FILE ENDP
 
+
 WRITE_SCREEN_TO_FILE_AUX PROC
     CALL WRITE_SCREEN_TO_FILE
     RET
 WRITE_SCREEN_TO_FILE_AUX ENDP
 
-;-----------------------------------
-; FUNCIÓN PARA CARGAR EL ARCHIVO
-;-----------------------------------
-
 LOAD_FILE PROC
      ; Abrir archivo
     MOV AH, 3DH               ; Función DOS para abrir archivo
     MOV AL, 00H               ; Modo de acceso: solo lectura
-    LEA DX, FILE_NAME         
+    LEA DX, FILE_NAME         ; Dirección del nombre del archivo
     INT 21H
-    JC FILE_ERROR_L            
-    MOV FILE_HANDLE, AX       
+    JC FILE_ERROR_L            ; Saltar si hubo error al abrir el archivo
+    MOV FILE_HANDLE, AX       ; Almacenar el manejador del archivo
 
     ; Inicializar coordenadas
-    MOV DI, 51                
-    MOV SI, 31                
+    MOV DI, 51                ; X inicial
+    MOV SI, 31                ; Y inicial
 
     READ_PIXELS:
         ; Leer un byte del archivo
-        MOV AH, 3FH               
-        MOV BX, FILE_HANDLE       
-        LEA DX, TEMP_CHAR_AUX     
-        MOV CX, 1                 
-        INT 21H                   
+        MOV AH, 3FH               ; Función DOS para leer de archivo
+        MOV BX, FILE_HANDLE       ; Manejador del archivo
+        LEA DX, TEMP_CHAR_AUX     ; Dirección para almacenar el byte leído
+        MOV CX, 1                 ; Leer un byte
+        INT 21H                   ; Leer del archivo
 
         ; Verificar si se alcanzó el fin del archivo
-        OR AX, AX                 
-        JZ END_LOAD               
+        OR AX, AX                 ; Si AX es 0, se ha llegado al final del archivo
+        JZ END_LOAD               ; Si AX = 0, saltar a END_LOAD para cerrar el archivo
 
         ; Comprobar el carácter leído
-        MOV AL, TEMP_CHAR_AUX     
+        MOV AL, TEMP_CHAR_AUX     ; Cargar el carácter leído en AL
         CMP AL, 0AH
         JE .NextRow
         CALL CHECK_COLORS_FOR_LOAD_FILE
         JMP .DrawPixel
-        JMP .Continue             
+        JMP .Continue             ; Si no es ni 'F' ni '0', saltar a continuar
 
     .DrawPixel:
         ; Mostrar el píxel en la pantalla con el color correspondiente en AL
-        MOV CX, DI                
-        MOV DX, SI                
+        MOV CX, DI                ; X
+        MOV DX, SI                ; Y
         MOV AH, 0CH               ; Función para escribir píxel (en modo gráfico)
-        INT 10H                   
+        INT 10H                   ; Llamada a BIOS para dibujar el píxel
 
     .Continue:
         ; Actualizar las coordenadas para el siguiente píxel
-        INC DI                    
-        JMP READ_PIXELS           
+        INC DI                    ; Incrementar X        
+        JMP READ_PIXELS           ; Continuar leyendo píxeles
 
     .NextRow:
-        MOV DI, 51                
-        INC SI                    
-        CMP SI, 429               
-        JBE READ_PIXELS           
+        MOV DI, 51                ; Reiniciar X a la posición inicial en nueva fila
+        INC SI                    ; Incrementar Y
+        CMP SI, 328               ; Limitar altura máxima (480)
+        JBE READ_PIXELS           ; Si SI <= 480, continuar
 
     END_LOAD:
         ; Cerrar archivo y terminar el procedimiento
-        MOV BX, FILE_HANDLE       
-        MOV AH, 3EH               
+        MOV BX, FILE_HANDLE       ; Manejador del archivo
+        MOV AH, 3EH               ; Función DOS para cerrar archivo
         INT 21H
         JMP MOVE_PIXEL
         RET
@@ -345,29 +340,30 @@ LOAD_FILE ENDP
 MOVE_PIXEL PROC
     ; Esperar por una tecla
     MOV AH, 00H
-    INT 16H         
+    INT 16H         ; Leer tecla presionada
 
-    CMP AL, 'r'
+    CMP AL, 'c'
     JE LOAD_FILE
     CMP AL, 's'
     JE WRITE_SCREEN_TO_FILE_AUX
-    CMP AL, 'c'     
+    ; Revisar las acciones
+    CMP AL, 'r'     ; Comprobar si se presionó 'R'
     JE CLEAR_SCREEN
     CMP AL, 'e'
     JE END_PROGRAM
 
-    
+    ; Comparar con las teclas de flecha
     CMP AL, 0H       ; Verificar si es una tecla especial
-    CALL CHECK_COLORS  
+    CALL CHECK_COLORS  ; Si no es tecla especial, salir
 
     ; Revisar las teclas de flechas
-    CMP AH, 48H     
+    CMP AH, 48H     ; Flecha hacia arriba
     JE MOVE_UP
-    CMP AH, 50H     
+    CMP AH, 50H     ; Flecha hacia abajo
     JE MOVE_DOWN
-    CMP AH, 4BH     
+    CMP AH, 4BH     ; Flecha hacia la izquierda
     JE MOVE_LEFT
-    CMP AH, 4DH     
+    CMP AH, 4DH     ; Flecha hacia la derecha
     JE MOVE_RIGHT
    
     CALL MOVEMENTS
@@ -387,13 +383,13 @@ MOVEMENTS PROC
     MOVE_UP:
         CMP [Y], 32      ; Verificar si estamos en el límite superior
         JLE MOVE_PIXEL  ; Si ya estamos en el límite, no mover
-        DEC [Y]         
+        DEC [Y]         ; Decrementar la coordenada Y
         CALL REDRAW_PIXEL
 
     MOVE_DOWN:
-        CMP [Y], 428    ; Verificar si estamos en el límite inferior
+        CMP [Y], 328    ; Verificar si estamos en el límite inferior
         JGE MOVE_PIXEL  ; Si ya estamos en el límite, no mover
-        INC [Y]         
+        INC [Y]         ; Incrementar la coordenada Y
         CALL REDRAW_PIXEL
 
     MOVE_LEFT:
@@ -403,9 +399,9 @@ MOVEMENTS PROC
         CALL REDRAW_PIXEL
 
     MOVE_RIGHT:
-        CMP [X], 417    ; Verificar si estamos en el límite derecho
+        CMP [X], 348    ; Verificar si estamos en el límite derecho
         JGE MOVE_PIXEL  ; Si ya estamos en el límite, no mover
-        INC [X]         
+        INC [X]         ; Incrementar la coordenada X
         CALL REDRAW_PIXEL
 MOVEMENTS ENDP
 ;-----------------------------------
@@ -414,9 +410,9 @@ MOVEMENTS ENDP
 REDRAW_PIXEL PROC
     ; Limpiar el píxel anterior dibujando con el color de fondo
     MOV AH, 0CH     ; Función para escribir píxel
-    MOV AL, BG_COLOR 
-    MOV CX, [X]     
-    MOV DX, [Y]     
+    MOV AL, BG_COLOR ; Color de fondo
+    MOV CX, [X]     ; Coordenada X
+    MOV DX, [Y]     ; Coordenada Y
     INT 10H         ; Dibujar el píxel en la posición anterior
     CALL DRAW_PIXEL ; Dibujar el nuevo píxel en la nueva posición
     JMP MOVE_PIXEL   ; Continuar esperando por teclas
@@ -428,21 +424,21 @@ REDRAW_PIXEL ENDP
 CLEAR_SCREEN PROC
     MOV DX, 31       ; Reiniciar coordenada Y en 31
     CLEAR_LOOP:
-        MOV AH, 0CH      
-        MOV AL, BG_COLOR  
+        MOV AH, 0CH      ; Función para escribir píxel
+        MOV AL, BG_COLOR  ; Color de fondo
         INT 10H          ; Dibujar píxel en (CX, DX) con color AL
 
-        INC CX           
-        CMP CX, 419      
-        JAE NEXT_ROW     
+        INC CX           ; Incrementar la coordenada X
+        CMP CX, 349      ; ¿Llegamos al borde de la pantalla?
+        JAE NEXT_ROW     ; Si llegamos al borde, ir a la siguiente fila
 
-        JMP CLEAR_LOOP   
+        JMP CLEAR_LOOP   ; Volver al bucle para limpiar el píxel actual
 
     NEXT_ROW:
         MOV CX, 51  
-        INC DX           
-        CMP DX, 429      
-        JL CLEAR_LOOP    
+        INC DX           ; Mover a la siguiente fila
+        CMP DX, 329      ; ¿Llegamos al fondo de la pantalla?
+        JL CLEAR_LOOP    ; Si no hemos llegado al fondo, continuar
 
         ; Regresar al bucle de selección de nuevo punto
         JMP WAIT_FOR_CLICK 
@@ -452,7 +448,7 @@ CLEAR_SCREEN ENDP
 ;-----------------------------------
 CHECK_COLORS PROC
     CMP AL, 30H     
-    JE CHANGE_COLOR_WHITE
+    JE CHANGE_COLOR_BLACK
     CMP AL, 31H     
     JE CHANGE_COLOR_BLUE
     CMP AL, 32H     
@@ -463,25 +459,15 @@ CHECK_COLORS PROC
     JE CHANGE_COLOR_PURPLE
     CMP AL, 35H     
     JE CHANGE_COLOR_BROWN
-
-
-    CMP AL, 36H
-    JE CHANGE_COLOR_LIGTH_BLUE
-    CMP AL, 37H
-    JE CHANGE_COLOR_LIGTH_GREEN
-    CMP AL, 38H
-    JE CHANGE_COLOR_YELLOW
-    CMP AL, 39H
-    JE CHANGE_COLOR_CYAN
     RET
 CHECK_COLORS ENDP
 ;-----------------------------------
 ; FUNCIONES PARA CAMBIAR LOS COLORES
 ;-----------------------------------
-CHANGE_COLOR_WHITE PROC
-    MOV [CURRENT_COLOR], 0FH
+CHANGE_COLOR_BLACK PROC
+    MOV [CURRENT_COLOR], 0
     RET
-CHANGE_COLOR_WHITE ENDP
+CHANGE_COLOR_BLACK ENDP
 
 CHANGE_COLOR_BLUE PROC
     MOV [CURRENT_COLOR], 1
@@ -506,27 +492,6 @@ CHANGE_COLOR_BROWN PROC
     MOV [CURRENT_COLOR], 6
     RET
 CHANGE_COLOR_BROWN ENDP
-
-CHANGE_COLOR_LIGTH_BLUE PROC
-    MOV [CURRENT_COLOR], 9
-    RET
-CHANGE_COLOR_LIGTH_BLUE ENDP
-
-CHANGE_COLOR_LIGTH_GREEN PROC
-    MOV [CURRENT_COLOR], 0AH
-    RET
-CHANGE_COLOR_LIGTH_GREEN ENDP
-
-CHANGE_COLOR_YELLOW PROC
-    MOV [CURRENT_COLOR], 0EH
-    RET
-CHANGE_COLOR_YELLOW ENDP
-
-CHANGE_COLOR_CYAN PROC
-    MOV [CURRENT_COLOR], 3
-    RET
-CHANGE_COLOR_CYAN ENDP
-
 ;-----------------------------------
 ; FUNCIÓN PARA VERIFICAR EL COLOR EN 
 ; AL
@@ -546,14 +511,6 @@ CHECK_COLORS_IN_AL PROC
     JE WriteBrown
     CMP AL, 15               ; Blanco
     JE WriteWhite
-    CMP AL, 9                ; Azul claro
-    JE WriteLightBlue
-    CMP AL, 0AH               ; Verde claro
-    JE WriteLightGreen
-    CMP AL, 0EH               ; Amarillo
-    JE WriteYellow
-    CMP AL, 3                ; Cyan
-    JE WriteCyan
     JMP BACKTOCONTINUEX            ; Si no coincide, continúa
 
     WriteBlack:
@@ -583,23 +540,6 @@ CHECK_COLORS_IN_AL PROC
     WriteWhite:
         MOV TEMP_CHAR, 'F'       ; Representación para color blanco
         RET
-
-    WriteLightBlue:
-        MOV TEMP_CHAR, '9'       ; Representación para color azul claro
-        RET
-    
-    WriteLightGreen:
-        MOV TEMP_CHAR, 'A'       ; Representación para color verde claro
-        RET
-
-    WriteYellow:
-        MOV TEMP_CHAR, 'E'       ; Representación para color amarillo
-        RET
-
-    WriteCyan:
-        MOV TEMP_CHAR, '3'       ; Representación para color cian
-        RET
-
     BACKTOCONTINUEX:
         RET
 CHECK_COLORS_IN_AL ENDP
@@ -624,7 +564,7 @@ ASK_FILE_NAME PROC
     MOV AH, 0AH
     INT 21H
 
-    MOV SI, CX               
+    MOV SI, CX               ; Copia el tamaño de la cadena a SI
     MOV BYTE PTR FILE_NAME[SI], 0   ; Agrega el carácter nulo al final del nombre
     RET
 ASK_FILE_NAME ENDP
@@ -633,92 +573,59 @@ ASK_FILE_NAME ENDP
 ; LADO DEL ÁREA DE TRABAJP
 ;-----------------------------------
 DRAW_COLORS PROC
-    POS_CURSOR 1, 65
-    LEA DX, TEXT_COLORS
-    MOV AH, 9H
-    INT 21H
 
     POS_CURSOR 3, 60
     LEA	DX, BLACK
-	MOV	AH, 9H		
+	MOV	AH, 9H		;VISUALIZACION CADENA DE CARACTERES
 	INT	21H
-    CALL DRAW_WHITE_SQUARE
+    CALL DRAW_BLACK_SQUARE
     
-    POS_CURSOR 3, 70
+    POS_CURSOR 6, 60
     LEA	DX, BLUE
-	MOV	AH, 9H		
+	MOV	AH, 9H		;VISUALIZACION CADENA DE CARACTERES
 	INT	21H
     CALL DRAW_BLUE_SQUARE
 
-    POS_CURSOR 5, 60
+    POS_CURSOR 9, 60
     LEA	DX, GREEN
-	MOV	AH, 9H		
+	MOV	AH, 9H		;VISUALIZACION CADENA DE CARACTERES
 	INT	21H
     CALL DRAW_GREEN_SQUARE
 
-    POS_CURSOR 5, 70
+    POS_CURSOR 12, 60
     LEA	DX, RED
-	MOV	AH, 9H		
+	MOV	AH, 9H		;VISUALIZACION CADENA DE CARACTERES
 	INT	21H
     CALL DRAW_RED_SQUARE
 
-    POS_CURSOR 7, 60
+    POS_CURSOR 15, 60
     LEA	DX, PURPLE
-	MOV	AH, 9H		
+	MOV	AH, 9H		;VISUALIZACION CADENA DE CARACTERES
 	INT	21H
     CALL DRAW_PURPLE_SQUARE
 
-    POS_CURSOR 7, 70
+    POS_CURSOR 18, 60
     LEA	DX, BROWN
-	MOV	AH, 9H		
+	MOV	AH, 9H		;VISUALIZACION CADENA DE CARACTERES
 	INT	21H
     CALL DRAW_BROWN_SQUARE
 
-    POS_CURSOR 9, 60
-    LEA	DX, LIGHT_BLUE
-	MOV	AH, 9H		
-	INT	21H
-    CALL DRAW_LIGHT_BLUE_SQUARE
-
-    POS_CURSOR 9, 70
-    LEA	DX, LIGHT_GREEN
-	MOV	AH, 9H		
-	INT	21H
-    CALL DRAW_LIGHT_GREEN_SQUARE
-
-    POS_CURSOR 11, 60
-    LEA	DX, YELLOW
-	MOV	AH, 9H		
-	INT	21H
-    CALL DRAW_YELLOW_SQUARE
-
-    POS_CURSOR 11, 70
-    LEA	DX, CYAN
-	MOV	AH, 9H		
-	INT	21H
-    CALL DRAW_CYAN_SQUARE
-
-    POS_CURSOR 18, 62
-    LEA DX, TEXT_COMMANDS
-    MOV AH, 9H
-    INT 21H
-
-    POS_CURSOR 20, 62
+    POS_CURSOR 22, 10
     LEA	DX, SAVE_FILE
-    MOV	AH, 9H		
+    MOV	AH, 9H		;VISUALIZACION CADENA DE CARACTER
     INT	21H
 
-    POS_CURSOR 22, 62
+    POS_CURSOR 22, 25
     LEA DX, EXIT
-    MOV AH, 9H		
+    MOV AH, 9H		;VISUALIZACION CADENA DE CARACTER
     INT 21H
 
-    POS_CURSOR 24, 62
+    POS_CURSOR 25, 10
     LEA DX, CLEAR
     MOV AH, 9H
     INT 21H
 
-    POS_CURSOR 26, 57
+    POS_CURSOR 25, 25
     LEA DX, LOAD
     MOV AH, 9H
     INT 21H
@@ -729,33 +636,34 @@ DRAW_COLORS ENDP
 ; FUNCIONES PARA DIBUJAR LOS CUADRITOS
 ; DE COLORES
 ;-----------------------------------
-DRAW_WHITE_SQUARE PROC
-        
-        MOV CX, 500         
-        MOV DX, 48         
+DRAW_BLACK_SQUARE PROC
+        ; Dibuja un cuadrado de 10x10 píxeles
+        MOV CX, 500          ; Establece la posición X
+        MOV DX, 48          ; Establece la posición Y
 
-        MOV DI, 16          
+        ; Dibuja 10 filas de 10 píxeles
+        MOV DI, 16            ; Número de filas
         BLACK_ROW_LOOP:
-            MOV BX, 16        
+            MOV BX, 16        ; Número de píxeles en la fila
             BLACK_COLUMN_LOOP:
-                MOV AL, 0FH 
-                MOV AH, 0Ch  
-                INT 10h       
+                MOV AL, 0 ; Establece el color
+                MOV AH, 0Ch   ; Función para escribir un píxel
+                INT 10h       ; Dibuja el píxel en (CX, DX)
 
-                INC CX        
-                DEC BX       
-                JNZ BLACK_COLUMN_LOOP 
+                INC CX        ; Incrementa la posición X
+                DEC BX        ; Decrementa el contador de píxeles
+                JNZ BLACK_COLUMN_LOOP ; Si no ha dibujado 10 píxeles, continúa
 
-            INC DX           
-            MOV CX, 500    
-            DEC DI            
-            JNZ BLACK_ROW_LOOP    
+            INC DX            ; Incrementa la posición Y para la siguiente fila
+            MOV CX, 500      ; Reinicia X a la posición inicial
+            DEC DI            ; Decrementa el contador de filas
+            JNZ BLACK_ROW_LOOP     ; Si no ha dibujado 10 filas, continúa
             RET
-DRAW_WHITE_SQUARE ENDP
+DRAW_BLACK_SQUARE ENDP
 DRAW_BLUE_SQUARE PROC
         ; Dibuja un cuadrado de 10x10 píxeles
-        MOV CX, 580          ; Establece la posición X
-        MOV DX, 48          ; Establece la posición Y
+        MOV CX, 500          ; Establece la posición X
+        MOV DX, 96          ; Establece la posición Y
 
         ; Dibuja 10 filas de 10 píxeles
         MOV DI, 16            ; Número de filas
@@ -766,239 +674,131 @@ DRAW_BLUE_SQUARE PROC
                 MOV AH, 0Ch   ; Función para escribir un píxel
                 INT 10h       ; Dibuja el píxel en (CX, DX)
 
-                INC CX        
-                DEC BX        
+                INC CX        ; Incrementa la posición X
+                DEC BX        ; Decrementa el contador de píxeles
                 JNZ BLUE_COLUMN_LOOP ; Si no ha dibujado 10 píxeles, continúa
 
             INC DX            ; Incrementa la posición Y para la siguiente fila
-            MOV CX, 580      ; Reinicia X a la posición inicial
+            MOV CX, 500      ; Reinicia X a la posición inicial
             DEC DI            ; Decrementa el contador de filas
             JNZ BLUE_ROW_LOOP     ; Si no ha dibujado 10 filas, continúa
             RET
 DRAW_BLUE_SQUARE ENDP
 DRAW_GREEN_SQUARE PROC
-        
-        MOV CX, 500          
-        MOV DX, 80          
+        ; Dibuja un cuadrado de 10x10 píxeles
+        MOV CX, 500          ; Establece la posición X
+        MOV DX, 144          ; Establece la posición Y
 
-        
-        MOV DI, 16            
+        ; Dibuja 10 filas de 10 píxeles
+        MOV DI, 16            ; Número de filas
         GREEN_ROW_LOOP:
-            MOV BX, 16        
+            MOV BX, 16        ; Número de píxeles en la fila
             GREEN_COLUMN_LOOP:
-                MOV AL, 2 
-                MOV AH, 0Ch   
-                INT 10h       
+                MOV AL, 2 ; Establece el color
+                MOV AH, 0Ch   ; Función para escribir un píxel
+                INT 10h       ; Dibuja el píxel en (CX, DX)
 
-                INC CX        
-                DEC BX        
-                JNZ GREEN_COLUMN_LOOP 
+                INC CX        ; Incrementa la posición X
+                DEC BX        ; Decrementa el contador de píxeles
+                JNZ GREEN_COLUMN_LOOP ; Si no ha dibujado 10 píxeles, continúa
 
-            INC DX            
-            MOV CX, 500      
-            DEC DI            
-            JNZ GREEN_ROW_LOOP     
+            INC DX            ; Incrementa la posición Y para la siguiente fila
+            MOV CX, 500      ; Reinicia X a la posición inicial
+            DEC DI            ; Decrementa el contador de filas
+            JNZ GREEN_ROW_LOOP     ; Si no ha dibujado 10 filas, continúa
             RET
 DRAW_GREEN_SQUARE ENDP
 DRAW_RED_SQUARE PROC
-        
-        MOV CX, 580          
-        MOV DX, 80          
+        ; Dibuja un cuadrado de 10x10 píxeles
+        MOV CX, 500          ; Establece la posición X
+        MOV DX, 192          ; Establece la posición Y
 
-        
-        MOV DI, 16            
+        ; Dibuja 10 filas de 10 píxeles
+        MOV DI, 16            ; Número de filas
         RED_ROW_LOOP:
-            MOV BX, 16        
+            MOV BX, 16        ; Número de píxeles en la fila
             RED_COLUMN_LOOP:
-                MOV AL, 4 
-                MOV AH, 0Ch   
-                INT 10h       
+                MOV AL, 4 ; Establece el color
+                MOV AH, 0Ch   ; Función para escribir un píxel
+                INT 10h       ; Dibuja el píxel en (CX, DX)
 
-                INC CX        
-                DEC BX        
-                JNZ RED_COLUMN_LOOP 
+                INC CX        ; Incrementa la posición X
+                DEC BX        ; Decrementa el contador de píxeles
+                JNZ RED_COLUMN_LOOP ; Si no ha dibujado 10 píxeles, continúa
 
-            INC DX            
-            MOV CX, 580      
-            DEC DI            
-            JNZ RED_ROW_LOOP     
+            INC DX            ; Incrementa la posición Y para la siguiente fila
+            MOV CX, 500      ; Reinicia X a la posición inicial
+            DEC DI            ; Decrementa el contador de filas
+            JNZ RED_ROW_LOOP     ; Si no ha dibujado 10 filas, continúa
             RET
 DRAW_RED_SQUARE ENDP
 DRAW_PURPLE_SQUARE PROC
-        
-        MOV CX, 500          
-        MOV DX, 112          
+        ; Dibuja un cuadrado de 10x10 píxeles
+        MOV CX, 500          ; Establece la posición X
+        MOV DX, 240          ; Establece la posición Y
 
-        
-        MOV DI, 16            
+        ; Dibuja 10 filas de 10 píxeles
+        MOV DI, 16            ; Número de filas
         PURPLE_ROW_LOOP:
-            MOV BX, 16        
+            MOV BX, 16        ; Número de píxeles en la fila
             PURPLE_COLUMN_LOOP:
-                MOV AL, 5 
-                MOV AH, 0Ch   
-                INT 10h       
+                MOV AL, 5 ; Establece el color
+                MOV AH, 0Ch   ; Función para escribir un píxel
+                INT 10h       ; Dibuja el píxel en (CX, DX)
 
-                INC CX        
-                DEC BX        
-                JNZ PURPLE_COLUMN_LOOP 
+                INC CX        ; Incrementa la posición X
+                DEC BX        ; Decrementa el contador de píxeles
+                JNZ PURPLE_COLUMN_LOOP ; Si no ha dibujado 10 píxeles, continúa
 
-            INC DX            
-            MOV CX, 500      
-            DEC DI            
-            JNZ PURPLE_ROW_LOOP     
+            INC DX            ; Incrementa la posición Y para la siguiente fila
+            MOV CX, 500      ; Reinicia X a la posición inicial
+            DEC DI            ; Decrementa el contador de filas
+            JNZ PURPLE_ROW_LOOP     ; Si no ha dibujado 10 filas, continúa
             RET
 DRAW_PURPLE_SQUARE ENDP
 DRAW_BROWN_SQUARE PROC
-        
-        MOV CX, 580          
-        MOV DX, 112          
+        ; Dibuja un cuadrado de 10x10 píxeles
+        MOV CX, 500          ; Establece la posición X
+        MOV DX, 288          ; Establece la posición Y
 
-        
-        MOV DI, 16            
+        ; Dibuja 10 filas de 10 píxeles
+        MOV DI, 16            ; Número de filas
         BROWN_ROW_LOOP:
-            MOV BX, 16        
+            MOV BX, 16        ; Número de píxeles en la fila
             BROWN_COLUMN_LOOP:
-                MOV AL, 6 
-                MOV AH, 0Ch   
-                INT 10h       
+                MOV AL, 6 ; Establece el color
+                MOV AH, 0Ch   ; Función para escribir un píxel
+                INT 10h       ; Dibuja el píxel en (CX, DX)
 
-                INC CX        
-                DEC BX        
-                JNZ BROWN_COLUMN_LOOP 
+                INC CX        ; Incrementa la posición X
+                DEC BX        ; Decrementa el contador de píxeles
+                JNZ BROWN_COLUMN_LOOP ; Si no ha dibujado 10 píxeles, continúa
 
-            INC DX            
-            MOV CX, 580      
-            DEC DI            
-            JNZ BROWN_ROW_LOOP     
+            INC DX            ; Incrementa la posición Y para la siguiente fila
+            MOV CX, 500      ; Reinicia X a la posición inicial
+            DEC DI            ; Decrementa el contador de filas
+            JNZ BROWN_ROW_LOOP     ; Si no ha dibujado 10 filas, continúa
             RET
 DRAW_BROWN_SQUARE ENDP
-
-DRAW_LIGHT_BLUE_SQUARE PROC
-        
-        MOV CX, 500          
-        MOV DX, 144          
-
-        
-        MOV DI, 16            
-        L_BLUE_ROW_LOOP:
-            MOV BX, 16        
-            L_BLUE_COLUMN_LOOP:
-                MOV AL, 9 
-                MOV AH, 0Ch   
-                INT 10h       
-
-                INC CX        
-                DEC BX        
-                JNZ L_BLUE_COLUMN_LOOP 
-
-            INC DX            
-            MOV CX, 500      
-            DEC DI            
-            JNZ L_BLUE_ROW_LOOP     
-            RET
-DRAW_LIGHT_BLUE_SQUARE ENDP
-
-DRAW_LIGHT_GREEN_SQUARE PROC
-        
-        MOV CX, 580          
-        MOV DX, 144          
-
-        
-        MOV DI, 16            
-        L_GREEN_ROW_LOOP:
-            MOV BX, 16        
-            L_GREEN_COLUMN_LOOP:
-                MOV AL, 0AH 
-                MOV AH, 0Ch   
-                INT 10h       
-
-                INC CX        
-                DEC BX        
-                JNZ L_GREEN_COLUMN_LOOP 
-
-            INC DX            
-            MOV CX, 580      
-            DEC DI            
-            JNZ L_GREEN_ROW_LOOP     
-            RET
-DRAW_LIGHT_GREEN_SQUARE ENDP
-
-DRAW_YELLOW_SQUARE PROC
-        
-        MOV CX, 500          
-        MOV DX, 176          
-
-        
-        MOV DI, 16            
-        YELLOW_ROW_LOOP:
-            MOV BX, 16        
-            YELLOW_COLUMN_LOOP:
-                MOV AL, 0EH 
-                MOV AH, 0Ch   
-                INT 10h       
-
-                INC CX        
-                DEC BX        
-                JNZ YELLOW_COLUMN_LOOP 
-
-            INC DX            
-            MOV CX, 500      
-            DEC DI            
-            JNZ YELLOW_ROW_LOOP     
-            RET
-DRAW_YELLOW_SQUARE ENDP
-DRAW_CYAN_SQUARE PROC
-        
-        MOV CX, 580          
-        MOV DX, 176          
-
-        
-        MOV DI, 16            
-        CYAN_ROW_LOOP:
-            MOV BX, 16        
-            CYAN_COLUMN_LOOP:
-                MOV AL, 3 
-                MOV AH, 0Ch   
-                INT 10h       
-
-                INC CX        
-                DEC BX        
-                JNZ CYAN_COLUMN_LOOP 
-
-            INC DX            
-            MOV CX, 580      
-            DEC DI            
-            JNZ CYAN_ROW_LOOP     
-            RET
-DRAW_CYAN_SQUARE ENDP
-
 ;-----------------------------------
 ; FUNCIÓN PARA VERIFICAR EL COLOR
 ; EN AL Y GRAFICAR
 ;-----------------------------------
 CHECK_COLORS_FOR_LOAD_FILE PROC
-    CMP AL, '0'               
-    JE .SetColorBlack         
-    CMP AL, '1'               
+    CMP AL, '0'               ; ¿Es '0'?
+    JE .SetColorBlack         ; Si es '0', pintar en negro
+    CMP AL, '1'               ; ¿Es '1'?
     JE .SetColorBlue
-    CMP AL, '2'               
+    CMP AL, '2'               ; ¿Es '2'?
     JE .SetColorGreen
-    CMP AL, '4'               
+    CMP AL, '4'               ; ¿Es '3'?
     JE .SetColorRed
-    CMP AL, '5'               
+    CMP AL, '5'               ; ¿Es '4'?
     JE .SetColorPurple
-    CMP AL, '6'               
+    CMP AL, '6'               ; ¿Es '5'?
     JE .SetColorBrown
-    CMP AL, 'F'               
-    JE .SetColorWhite         
-    CMP AL, '9'               
-    JE .SetColorLigthBlue
-    CMP AL, 'A'              
-    JE .SetColorLigthGreen
-    CMP AL, 'E'              
-    JE .SetColorLigthYellow
-    CMP AL, '3'            
-    JE .SetColorCyan
+    CMP AL, 'F'               ; ¿Es 'F'?
+    JE .SetColorWhite         ; Si es 'F', pintar en blanco
     RET
     .SetColorBlack:
         MOV AL, 0                 ; Color negro (0 en modo gráfico)
@@ -1020,18 +820,6 @@ CHECK_COLORS_FOR_LOAD_FILE PROC
         RET
     .SetColorWhite:
         MOV AL, 15                ; Color blanco (15 en modo gráfico)
-        RET
-    .SetColorLigthBlue:
-        MOV AL, 9                ; Color azul claro (12 en modo gráfico)
-        RET
-    .SetColorLigthGreen:
-        MOV AL, 10                 ; Color verde claro (2 en modo gráfico)
-        RET
-    .SetColorLigthYellow:
-        MOV AL, 14                ; Color amarillo claro (14 en modo gráfico)
-        RET
-    .SetColorCyan:
-        MOV AL, 3                 ; Color cian (3 en modo gráfico)
         RET
     
 CHECK_COLORS_FOR_LOAD_FILE ENDP
